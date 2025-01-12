@@ -133,7 +133,7 @@ function App() {
       {/* Stacked Bar Chart for platform usage by client */}
       <div className="card mb-4">
         <div className="card-body">
-          <h5>Platform Usage by Client (Stacked Bar Chart)</h5>
+          <h5>Platform Usage by Client</h5>
           <div style={{ width: '100%', height: 400 }}>
             <ResponsiveContainer>
               <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 5 }}>

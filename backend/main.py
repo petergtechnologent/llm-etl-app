@@ -14,7 +14,6 @@ load_dotenv()  # Load environment variables from .env if you want
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 openai.api_key = OPENAI_API_KEY
 
-# We will read MONGO_URI from environment variables as well, or fallback to default
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://db:27017")
 
 client = MongoClient(MONGO_URI)
@@ -23,9 +22,8 @@ collection = db["notes_collection"]
 
 app = FastAPI()
 
-# Configure CORS so React can talk to our backend
 origins = [
-    "http://localhost:3000",  # React dev server or the containerized server
+    "http://localhost:3000",  # React dev server or containerized
 ]
 app.add_middleware(
     CORSMiddleware,
@@ -38,33 +36,55 @@ app.add_middleware(
 
 class Note(BaseModel):
     id: str
-    client: str = None
-    target_demographic: str = None
-    platforms: List[str] = []
-    notes: str = None
+    client: str
+    target_demographic: str
+    platforms: List[str]
+    notes: str
 
 
 @app.get("/")
 def root():
-    return {"message": "Welcome to the LLM-Enhanced ETL API"}
+    return {"message": "Welcome to the Enhanced LLM-ETL API"}
 
 
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     """
-    Upload a text file, parse it with the LLM, store in MongoDB,
-    and return the structured data with _id converted to string.
+    1. Receive a text file.
+    2. Send it to the LLM for parsing into multiple structured objects if needed.
+    3. Each parsed object is inserted separately into MongoDB.
+    4. Return an array of inserted objects with _id (converted to string).
     """
     try:
         raw_content = (await file.read()).decode("utf-8", errors="ignore")
         
-        # Use the LLM to parse and structure this data
         prompt = f"""
-        You will receive raw text notes about an ad/media targeting plan. 
-        Extract and standardize the information into JSON fields with keys:
-        "client", "target_demographic", "platforms", and "notes".
-        If something is missing, use a placeholder. 
-        Here is the text:
+        You will receive raw text notes about one or more ad/media targeting plans.
+        They may contain multiple distinct sets of information for different clients.
+
+        Task:
+        1. Identify each 'group' of data if multiple groups/clients/campaigns appear.
+        2. For each group, extract these fields:
+           - client
+           - target_demographic
+           - platforms
+           - notes (a summary of what's important or leftover details)
+
+        3. If a field cannot be identified, use "NOT FOUND" for that field.
+        4. Return an array of JSON objects. Example:
+           [
+             {
+               "client": "...",
+               "target_demographic": "...",
+               "platforms": ["...", "..."],
+               "notes": "..."
+             },
+             {
+               ...
+             }
+           ]
+
+        Here is the raw text:
         {raw_content}
         """
 
@@ -78,33 +98,51 @@ async def upload_file(file: UploadFile = File(...)):
         )
 
         parsed_text = response.choices[0].message["content"].strip()
-        
-        # Try to parse JSON output
+
+        # Expecting an array of objects. Try to parse it. 
+        # If it fails or isn't valid JSON, we fall back to a single default doc.
         try:
-            structured_data = json.loads(parsed_text)
+            parsed_array = json.loads(parsed_text)
+            if not isinstance(parsed_array, list):
+                # Force it into a list if the LLM didn't provide an array
+                parsed_array = [parsed_array]
         except json.JSONDecodeError:
-            # fallback if the LLM didn't provide valid JSON
-            structured_data = {
-                "client": None,
-                "target_demographic": None,
+            parsed_array = [{
+                "client": "NOT FOUND",
+                "target_demographic": "NOT FOUND",
                 "platforms": [],
                 "notes": raw_content
+            }]
+
+        # Insert each object as a separate document
+        inserted_docs = []
+        for obj in parsed_array:
+            client_val = obj.get("client", "NOT FOUND") or "NOT FOUND"
+            target_val = obj.get("target_demographic", "NOT FOUND") or "NOT FOUND"
+            platforms_val = obj.get("platforms", [])
+            if not isinstance(platforms_val, list):
+                platforms_val = [str(platforms_val)]
+            notes_val = obj.get("notes", "NOT FOUND") or "NOT FOUND"
+
+            note_id = str(uuid.uuid4())
+            structured_data = {
+                "id": note_id,
+                "client": client_val,
+                "target_demographic": target_val,
+                "platforms": platforms_val,
+                "notes": notes_val
             }
 
-        # Insert a unique ID
-        note_id = str(uuid.uuid4())
-        structured_data["id"] = note_id
-
-        # Insert into MongoDB
-        insert_result = collection.insert_one(structured_data)
-
-        # Convert MongoDB's _id to a string if you want to keep it, or remove it
-        structured_data["_id"] = str(insert_result.inserted_id)
+            insert_result = collection.insert_one(structured_data)
+            structured_data["_id"] = str(insert_result.inserted_id)
+            inserted_docs.append(structured_data)
 
         return {
             "status": "success",
-            "data": structured_data
+            "count": len(inserted_docs),
+            "data": inserted_docs
         }
+
     except Exception as e:
         return {
             "status": "error",
@@ -114,24 +152,18 @@ async def upload_file(file: UploadFile = File(...)):
 
 @app.get("/notes", response_model=List[Note])
 def get_notes():
-    """
-    Retrieve all structured notes from the database.
-    Convert the _id field to string or remove it.
-    """
     notes_cursor = collection.find({})
     notes_list = []
     for doc in notes_cursor:
-        # Convert ObjectId to string if it exists
         if "_id" in doc:
             doc["_id"] = str(doc["_id"])
-        # Convert to Note model. If doc doesn't have 'id', fallback to the string version of _id
         notes_list.append(
             Note(
-                id=doc.get("id", doc["_id"]),
-                client=doc.get("client", ""),
-                target_demographic=doc.get("target_demographic", ""),
+                id=doc.get("id", ""),
+                client=doc.get("client", "NOT FOUND"),
+                target_demographic=doc.get("target_demographic", "NOT FOUND"),
                 platforms=doc.get("platforms", []),
-                notes=doc.get("notes", "")
+                notes=doc.get("notes", "NOT FOUND")
             )
         )
     return notes_list

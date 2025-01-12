@@ -1,188 +1,90 @@
-# LLM-Enhanced ETL Application
+# LLM-Enhanced ETL Application (Enhanced Version)
 
-An end-to-end application that:
-- Ingests large, messy text notes regarding media targeting and advertisement.  
-- Uses a Large Language Model (OpenAI) via FastAPI to parse and standardize those notes into a consistent schema.  
-- Stores structured data in MongoDB.  
-- Provides a React frontend to view and upload new notes.
+This project ingests messy text files containing notes on media targeting and advertisement, uses a Large Language Model (OpenAI) to parse them into standardized records, and stores them in a MongoDB database. A React-based frontend allows you to upload new notes, view and filter results, and see simple data visualizations.
 
 ## Table of Contents
-1. [Features](#features)  
-2. [Architecture Overview](#architecture-overview)  
-3. [Prerequisites](#prerequisites)  
-4. [Installation & Setup](#installation--setup)  
-5. [Usage](#usage)  
-6. [Configuration](#configuration)  
-7. [Folder Structure](#folder-structure)  
-8. [Contributing](#contributing)  
-9. [License](#license)
+1. [What's New](#whats-new)
+2. [Features](#features)
+3. [Architecture Overview](#architecture-overview)
+4. [Prerequisites](#prerequisites)
+5. [Installation & Setup](#installation--setup)
+6. [Usage](#usage)
+7. [Configuration](#configuration)
+8. [Folder Structure](#folder-structure)
+9. [Enhancements](#enhancements)
+10. [Contributing](#contributing)
+11. [License](#license)
 
----
+## What's New
+1. **Enhanced Prompting**  
+   - The LLM prompt has been improved to identify multiple separate sets of data within a single text file, returning each set as its own record.  
+   - Fallbacks are used: if a field can’t be found, "NOT FOUND" is inserted to ensure consistency.
+
+2. **Multiple Record Insertion**  
+   - If the LLM sees multiple campaigns or clients in the same file, we now split them into multiple documents.
+
+3. **Refined UI**  
+   - The React frontend is styled with a modern approach (e.g., Bootstrap) and includes a simple bar chart visualization (powered by `recharts`) to illustrate notes by client.
 
 ## Features
-1. **File Upload**  
-   - Upload raw text files through a React-based UI.
-2. **LLM Parsing**  
-   - Uses OpenAI’s GPT model to parse unstructured text and extract fields such as client name, target audience, platforms, and notes.
-3. **Database Storage**  
-   - Stores the parsed data in a MongoDB collection.
-4. **Data Browsing**  
-   - View existing parsed notes in the frontend, including client name, demographic, platforms, and notes.
-5. **Containerized**  
-   - The entire project (backend, frontend, and MongoDB) runs via `docker-compose`.
-
----
+- **File Upload**: Upload raw text files through a React UI.  
+- **LLM Parsing**: GPT-3.5-turbo (OpenAI) extracts structured data from messy notes.  
+- **Multiple Record Storage**: Automatically create multiple entries if multiple clients/campaigns are found.  
+- **Data Browsing**: View structured notes in a card layout.  
+- **Data Visualization**: Simple bar chart showing the count of notes by client.  
+- **MongoDB Storage**: Stores documents in `notes_db.notes_collection`.  
+- **Containerized**: The entire app (backend, frontend, database) runs on Docker Compose.
 
 ## Architecture Overview
-
-```
-                   +--------------+
-                   |   React UI   |
-                   |  (Frontend)  |
-                   +------+------+  
-                          |  (HTTP)
-                          v
-        +------------------------+
-        |      FastAPI API      |
-        | (LLM Parsing Logic)   | ---->   Calls OpenAI API
-        +----------+------------+
-                   |
-                   |  (MongoDB client)
-                   v
-             +-----------+
-             |  MongoDB  |
-             +-----------+
-```
-
-1. **Frontend (React)**  
-   - Uploads text files  
-   - Displays structured notes
-2. **Backend (FastAPI)**  
-   - Receives uploaded files (`/upload`)  
-   - Sends content to OpenAI for parsing  
-   - Stores parsed results in MongoDB  
-   - Exposes `/notes` endpoint to list stored data
-3. **MongoDB**  
-   - Stores all parsed notes in `notes_db.notes_collection`
-
----
+               +--------------+
+               |   React UI   |
+               |  (Frontend)  |
+               +------+------+  
+                      |  
+                      v
+    +------------------------+
+    |      FastAPI API      |
+    | (LLM Parsing Logic)   | ----> Calls OpenAI
+    +----------+------------+
+               |
+               |  (MongoDB)
+               v
+          +-------------+
+          |   MongoDB   |
+          +-------------+
 
 ## Prerequisites
-
-1. **Docker & Docker Compose**  
-   - Make sure you have Docker installed (version 20+ recommended).
-   - Docker Compose plugin or `docker-compose` CLI must be available.
-2. **OpenAI API Key**  
-   - You need a valid OpenAI API key to enable the LLM parsing. 
-
----
+- **Docker & Docker Compose**  
+- **OpenAI API Key**
 
 ## Installation & Setup
-
-1. **Clone the Repository**  
-   ```bash
-   git clone https://github.com/yourusername/my-etl-llm-app.git
-   cd my-etl-llm-app
-   ```
-
-2. **Set Environment Variables**  
-   - Create a `.env` file in the root directory (or set them in your shell), for example:
-     ```
-     OPENAI_API_KEY=sk-<your-api-key>
-     ```
-   - By default, the backend looks for `OPENAI_API_KEY` and (optionally) `MONGO_URI`.
-
-3. **Build & Run Containers**  
-   ```bash
-   docker-compose up --build
-   ```
-   - This will:
-     1. Pull/build the MongoDB container.  
-     2. Build the FastAPI backend container (including dependencies).  
-     3. Build the React frontend container, then serve it via Nginx.
-
-4. **Check Logs**  
-   - In the terminal, you’ll see logs for `my_mongo`, `my_backend`, and `my_frontend`.  
-   - If everything starts without errors, you’re ready to use the app.
-
----
+1. **Clone the Repo** or put this code in your own repo, then `cd` to the project root.
+2. **Set Your OpenAI API Key**  
+   - Create a `.env` file or export in your shell:  
+     `export OPENAI_API_KEY=sk-xxxxx`
+3. **Run**  
+   - `docker-compose up --build`
 
 ## Usage
-
-1. **Access the Frontend**  
-   - Go to [http://localhost:3000](http://localhost:3000) (by default) in your browser.  
-   - You should see the React UI with an option to upload files and a list of parsed notes.
-
-2. **Upload a File**  
-   - Click on the file chooser button.  
-   - Select a messy notes text file (e.g. `random1.txt`, `huge_messy_notes.txt`, etc.).  
-   - Click **Upload**.  
-
-3. **View Parsed Notes**  
-   - Once uploaded, the backend sends the file content to the OpenAI API for parsing.  
-   - The structured data is stored in MongoDB.  
-   - The frontend will automatically refresh to show the newly added note(s).
-
----
+- **Frontend**: [http://localhost:3000](http://localhost:3000)  
+- **Backend**: [http://localhost:8000](http://localhost:8000)
 
 ## Configuration
-
-- **Environment Variables**  
-  - **`OPENAI_API_KEY`**: Required. Your personal or org-level key from OpenAI.  
-  - **`MONGO_URI`**: Optional. If you want to point to an external Mongo instance. By default, it uses `mongodb://db:27017`.
-
-- **Ports**  
-  - **Backend**: Exposed on `8000`.  
-  - **Frontend**: Exposed on `3000`.  
-  - **MongoDB**: Exposed on `27017`.  
-
-You can modify these in the `docker-compose.yml` file if needed.
-
----
+- **OPENAI_API_KEY**  
+- **MONGO_URI** (optional)
 
 ## Folder Structure
+. ├── backend/ │ ├── main.py │ ├── requirements.txt │ ├── Dockerfile │ ├── frontend/ │ ├── public/ │ │ └── index.html │ ├── src/ │ │ ├── App.js │ │ ├── api.js │ └── Dockerfile │ ├── db/ │ └── Dockerfile ├── docker-compose.yml └── README.md
 
-```
-my-etl-llm-app/
-│
-├── backend/
-│   ├── main.py
-│   ├── requirements.txt
-│   ├── Dockerfile
-│   └── ...
-│
-├── frontend/
-│   ├── package.json
-│   ├── Dockerfile
-│   └── src/
-│       ├── App.js
-│       ├── api.js
-│       └── ...
-│
-├── db/
-│   ├── Dockerfile (optional, we might just use official Mongo image)
-│   └── ...
-│
-├── data/
-│   ├── random1.txt
-│   ├── random2.txt
-│   └── ...
-│
-├── docker-compose.yml
-├── .env (ignored in git, stores your OPENAI_API_KEY)
-└── README.md
-```
-
----
+## Enhancements
+- **Advanced Prompting** with structured fallback fields.
+- **Multiple Document Parsing** per file.
+- **Bootstrap** & **Recharts** for a clean UI and simple visualization.
 
 ## Contributing
+1. **Fork** the repo
+2. **Create** a new branch
+3. **Make** changes, commit, push, and open a Pull Request
 
-1. **Fork** the repository.  
-2. **Create** a new branch (`git checkout -b feature/my-new-feature`).  
-3. **Commit** your changes (`git commit -am 'Add some feature'`).  
-4. **Push** to the branch (`git push origin feature/my-new-feature`).  
-5. **Open** a Pull Request on GitHub.
 
----
-
-**Enjoy your LLM-Enhanced ETL System!**  
+Enjoy your enhanced LLM-ETL system!

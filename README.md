@@ -1,8 +1,3 @@
-# llm-etl-app
-Below is a sample **README.md** file that you can place in your project’s root directory. It explains the core concept of your ETL+LLM system, how to install and run it, as well as how to upload and view data using the frontend.
-
----
-
 # LLM-Enhanced ETL Application
 
 An end-to-end application that:

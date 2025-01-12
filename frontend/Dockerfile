@@ -9,6 +9,7 @@ COPY package.json ./
 
 # Install dependencies
 RUN yarn install
+RUN yarn add recharts
 
 # Copy the rest of the source
 COPY . .

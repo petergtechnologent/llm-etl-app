@@ -1,0 +1,4 @@
+Client: ACME Corp
+Target: Males aged 25-34
+Preferred Platforms: Social media, streaming services
+Notes: Heavily interested in brand awareness. Mention sports in the ad copy. 
